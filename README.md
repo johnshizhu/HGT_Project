@@ -5,5 +5,4 @@ Goals:
 Reproduce HGT implementation
 Introduce distributed training implementation, accelerated by forced sparsity to speed up iter-device communication. 
 
-https://github.com/UCLA-DM/pyHGT/tree/master
-
+https://dl.acm.org/doi/fullHtml/10.1145/3366423.3380027
