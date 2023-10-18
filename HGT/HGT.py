@@ -3,6 +3,7 @@ Implementation of Heterogeneous Graph Transformer (HGT)
 Refer to section 3 of HGT
 '''
 from ogb_load import Loader
+from local_access import Local_Access
 import torch
 import torch.nn as nn
 from torch_geometric.nn import GATConv
