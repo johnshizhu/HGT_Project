@@ -33,25 +33,18 @@ class HGT():
         '''
 
         return
-    
-    def attention(self, s, e, t):
-        '''
-        Heterogeneous Mutual Attention        
-        Input:
-         - s - source node projection
-         - e - 
-         - t - target node projection
-        Output:
-         - attention - Attention embedding
-        
-        '''
 
-        return
+    # Heterogeneous Mutual Attention
 
-    def key(self, W, H, s):
+    def key(self, H, s):
         '''
         Projection of the source node
         Qi(s) = Q-Linear (H^l-1[s])
+        Input:
+         - H - Output of previous layer
+         - s - source node
+        Output:
+         - Linear projection
         '''
         Qs = nn.Linear()
 
@@ -66,3 +59,44 @@ class HGT():
 
         return
     
+    def attention(self, key, W, query):
+        '''
+        Heterogeneous Mutual Attention 
+               
+        Input:
+         - key - 
+         - W - 
+         - query - 
+        Output:
+         - attention - Attention embedding
+        '''
+
+        return
+    
+    # Heterogeneous Message Passing - pass info from source nodes to target nodes
+
+    def message(self, head):
+        '''
+        Concat all h message heads to get Message for each node pair
+        '''
+
+
+        return
+    
+    def messageHead(self):
+
+        return
+    
+    def value(self):
+        '''
+        Linear Projection of source node s into ith message vector
+        '''
+        Qv = nn.Linear()
+
+        return
+    
+    # Target Specific Aggregation
+
+    def aggregate(self):
+
+        return
