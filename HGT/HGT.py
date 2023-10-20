@@ -36,41 +36,57 @@ class HGT():
 
     # Heterogeneous Mutual Attention
 
-    def key(self, H, s):
+    def key(self, in_dim, out_dim, node_features):
         '''
         Projection of the source node
         Qi(s) = Q-Linear (H^l-1[s])
         Input:
-         - H - Output of previous layer
-         - s - source node
+         - in_dim - dimension of input node features H^l-1[s] --> d
+         - out_dim - output dimension, d/h, h is head cout
         Output:
-         - Linear projection
+         - output - Linear projection of key
         '''
-        Qs = nn.Linear()
-
-        return
+        Qs = nn.Linear(in_dim, out_dim)
+        output = Qs(node_features)
+        return output
     
-    def query(self):
+    def query(self, in_dim, out_dim, node_features):
         '''
         Projection of the target node
         Qi(t) = Q-Linear (H^l-1[t])
+        Input:
+         - in_dim - dimension of input node features H^l-1[s] --> d
+         - out_dim - output dimension d/h, h is head count
+        Output:
+         - output - Linear projection of query
         '''
-        Qt = nn.Linear()
-
-        return
+        Qt = nn.Linear(in_dim, out_dim)
+        output = Qt(node_features)
+        return output
     
     def attention(self, key, W, query):
         '''
         Heterogeneous Mutual Attention 
                
         Input:
-         - key - 
-         - W - 
-         - query - 
+         - key - Linear project of key
+         - W - distinct edge-based weight matrix for each edge type
+         - query - Linear projection of query
         Output:
          - attention - Attention embedding
         '''
+        # Transpose of query
+        t_query = torch.t(query)
 
+        # Dot product key, weight, query_transpose (left side)
+        temp = torch.dot(key, W)
+        left = torch.dot(temp, t_query)
+
+        # right hand side meta relation
+
+
+        # softmax
+        soft = nn.Softmax()
         return
     
     # Heterogeneous Message Passing - pass info from source nodes to target nodes
