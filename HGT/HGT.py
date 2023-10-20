@@ -113,6 +113,28 @@ class HGT():
     
     # Target Specific Aggregation
 
-    def aggregate(self):
+    def aggregate(self, attention, message_passing, res_con):
+        '''
+        Target Specific Aggregation
 
-        return
+        Input:
+         - attention - Heterogeneous Mutual Attention
+         - message_passing - Heterogeneous Message Passing
+         - res_con - Residual connection
+        Output:
+         - aggregate
+        
+        '''
+        # Element Wise Multiplication
+
+        # Element Wise Addition
+
+        # Activation
+
+        # Linear Layer
+
+        # Element wise Addition w/ Residual Connection
+
+        aggregate = 
+
+        return aggregate
