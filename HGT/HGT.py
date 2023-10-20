@@ -34,17 +34,13 @@ class HGT():
 
         return
     
-    def attention(self):
+    def attention(self, s, e, t):
         '''
-        Heterogeneous Mutual Attention
-        Softmax(a(WH^(l-1)[t] || WH^(l-1)[s]))
-        ∀s ∈ N(t)
-        
-        Given target node t, and all its neightbors=[s ∈ N(t)], which might belon got different distributions,
-        calculate mutual attention grounded by their meta relations ⟨τ (s),ϕ(e), τ (t)⟩
-        
+        Heterogeneous Mutual Attention        
         Input:
-         - 
+         - s - source node projection
+         - e - 
+         - t - target node projection
         Output:
          - attention - Attention embedding
         
@@ -52,25 +48,21 @@ class HGT():
 
         return
 
-    def message(self, W, H, s):
+    def key(self, W, H, s):
         '''
-        Heterogeneous Message Passing
-        Message_GAT(s) = WH^(l-1)[s]
-        Input:
-         - W --> weight matrix
-         - H --> H^ l-1 (output of the previous layer)
-         - s --> source node
+        Projection of the source node
+        Qi(s) = Q-Linear (H^l-1[s])
         '''
-        
+        Qs = nn.Linear()
 
         return
     
-    def aggregate(self):
+    def query(self):
         '''
-        Target-Specific Aggregation
-        Aggregate (Attention(s,t) DOT (Message (s)))
-
+        Projection of the target node
+        Qi(t) = Q-Linear (H^l-1[t])
         '''
+        Qt = nn.Linear()
 
         return
     
