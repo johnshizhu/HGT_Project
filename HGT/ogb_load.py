@@ -25,5 +25,5 @@ class Loader():
         return
     
     def get_embedding(self):
-
+        
         return

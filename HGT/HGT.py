@@ -5,6 +5,7 @@ Refer to section 3 of HGT
 from ogb_load import Loader
 from local_access import Local_Access
 import torch
+import numpy as np
 import torch.nn as nn
 from torch_geometric.nn import GATConv
 from torch_geometric.nn.conv import MessagePassing
@@ -20,10 +21,10 @@ class HGT():
     '''
     def __init__(self, input_graph):
         '''
-        Input - input_graph (Pytorch_Geometric Heterogeneous Graph object)
+        Input
+         - input_graph (Pytorch_Geometric Heterogeneous Graph object)
         '''
         self.graph = input_graph
-
         return
     
     def layer(self):
@@ -49,15 +50,18 @@ class HGT():
         
         '''
 
-
         return
 
-    def message(self):
+    def message(self, W, H, s):
         '''
         Heterogeneous Message Passing
         Message_GAT(s) = WH^(l-1)[s]
-
+        Input:
+         - W --> weight matrix
+         - H --> H^ l-1 (output of the previous layer)
+         - s --> source node
         '''
+        
 
         return
     
