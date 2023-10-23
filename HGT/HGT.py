@@ -11,7 +11,7 @@ from torch_geometric.nn import GATConv
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.utils import softmax
 from torch_geometric.data import HeteroData
-
+import math
 
 class HGT():
     '''
@@ -64,16 +64,18 @@ class HGT():
         output = Qt(node_features)
         return output
     
-    def attention(self, key, W, query):
+    def attentionHead(self, key, W, query, mu, d):
         '''
-        Heterogeneous Mutual Attention 
+        Heterogeneous Mutual Attention HEAD calculation
                
         Input:
          - key - Linear project of key
          - W - distinct edge-based weight matrix for each edge type
          - query - Linear projection of query
+         - mu - meta relation triplet information of shape (number of node types, number of edge relations, number of node types)
+         - d - dimension of the key and query vectors
         Output:
-         - attention - Attention embedding
+         - attention - Scalar value representing the unnormalized attention score predicted by attention head
         '''
         # Transpose of query
         t_query = torch.t(query)
@@ -83,10 +85,25 @@ class HGT():
         left = torch.dot(temp, t_query)
 
         # right hand side meta relation
+        right = mu/math.sqrt(d)
+
+        # element wise multiplication
+        return left * right
+
+    
+    def attention(self, h, s, e, t):
+        '''
+        Attention Calculation
+        Inputs:
+         - h - Number of attention heads
+         - s - Source node
+         - e - edge type between source and target
+         - t - target node
+        Outputs:
+         - attention - vector of attention score between s and t w/ respect to all neighbors
+        '''
 
 
-        # softmax
-        soft = nn.Softmax()
         return
     
     # Heterogeneous Message Passing - pass info from source nodes to target nodes
@@ -135,6 +152,6 @@ class HGT():
 
         # Element wise Addition w/ Residual Connection
 
-        aggregate = 
+        # aggregate = 
 
-        return aggregate
+        return
