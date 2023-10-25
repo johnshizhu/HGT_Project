@@ -124,6 +124,7 @@ class HGT():
         '''
         Linear Projection of source node s into ith message vector
         '''
+        # POssible object oriented approach to this instead????
         Qv = nn.Linear()
 
         return
