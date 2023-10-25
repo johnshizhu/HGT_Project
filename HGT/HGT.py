@@ -111,13 +111,19 @@ class HGT():
     def message(self, head):
         '''
         Concat all h message heads to get Message for each node pair
+        
         '''
 
 
         return
     
-    def messageHead(self):
-
+    def messageHead(self, H, W):
+        '''
+        Calculation of Message Head
+        Input:
+         - H - Previous layer input
+         - W - Weight matrix
+        '''
         return
     
     def value(self):
