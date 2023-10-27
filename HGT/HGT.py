@@ -13,6 +13,37 @@ from torch_geometric.utils import softmax
 from torch_geometric.data import HeteroData
 import math
 
+class HGTLayer(MessagePassing):
+    def __init__(self, in_dim, out_dim, num_node_types, num_edge_types, num_heads, use_norm):
+        super(HGTLayer, self).__init__()
+
+        self.in_dim         = in_dim            # Input dimension
+        self.out_dim        = out_dim           # Output dimension
+        self.num_node_types = num_node_types    # Number of Node types
+        self.num_edge_types = num_edge_types    # Number of Edge Types
+        self.num_heads      = num_heads         # Number of Attention Heads
+        self.use_norm       = use_norm          # (True/False) Use Normalization
+
+        # Linear Projections
+        self.key_projs      = nn.ModuleList()
+        self.query_projs    = nn.ModuleList()
+        self.value_projs    = nn.ModuleList()
+
+        for i in range(num_node_types):
+            self.key_projs.append(nn.Linear(in_dim, out_dim))
+            self.query_projs.append(nn.Linear(in_dim, out_dim))
+            self.value_projs.append(nn.Linear(in_dim, out_dim))
+
+    def forward(self, ):
+        return self.propagate()
+
+    def message():
+        
+    def update():
+
+
+
+
 class HGT():
     '''
     Attention --> estimates the importance of each source node
@@ -36,33 +67,37 @@ class HGT():
 
     # Heterogeneous Mutual Attention
 
-    def key(self, in_dim, out_dim, node_features):
+    def key_linear(self, in_dim, out_dim, num_types):
         '''
         Projection of the source node
         Qi(s) = Q-Linear (H^l-1[s])
         Input:
          - in_dim - dimension of input node features H^l-1[s] --> d
          - out_dim - output dimension, d/h, h is head cout
+         - num_types - number of types
         Output:
          - output - Linear projection of key
         '''
-        Qs = nn.Linear(in_dim, out_dim)
-        output = Qs(node_features)
-        return output
+        key_linears = nn.ModuleList()
+        for i in range(num_types):
+            key_linears.append(nn.Linear(in_dim, out_dim))
+        return key_linears
     
-    def query(self, in_dim, out_dim, node_features):
+    def query_linear(self, in_dim, out_dim, num_types):
         '''
-        Projection of the target node
+        Projection of the TARGET node
         Qi(t) = Q-Linear (H^l-1[t])
         Input:
          - in_dim - dimension of input node features H^l-1[s] --> d
          - out_dim - output dimension d/h, h is head count
+         - num_types - number of types
         Output:
          - output - Linear projection of query
         '''
-        Qt = nn.Linear(in_dim, out_dim)
-        output = Qt(node_features)
-        return output
+        query_linears = nn.ModuleList()
+        for i in range(num_types):
+            query_linears.append(nn.Linear(in_dim, out_dim))
+        return query_linears
     
     def attentionHead(self, key, W, query, mu, d):
         '''
@@ -108,6 +143,35 @@ class HGT():
     
     # Heterogeneous Message Passing - pass info from source nodes to target nodes
 
+    def value_linear(self, in_dim, out_dim, num_types, ):
+        '''
+        Projection of the sources node(s)
+        Qi(t) = Q-Linear (H^l-1[t])
+        Input:
+         - in_dim - dimension of input node features H^l-1[s] --> d
+         - out_dim - output dimension d/h, h is head count
+         - num_types - number of types
+        Output:
+         - output - Linear projection of query
+        '''
+        value_linears = nn.ModuleList()
+        for i in range(num_types):
+            value_linears.append(nn.Linear(in_dim, out_dim))
+        return value_linears
+
+    def messageHead(self, H, W):
+        '''
+        Calculation of Message Head
+        Input:
+         - H - Previous layer input
+         - W - Weight matrix
+        Output:
+         - head - Linear Projection 
+        '''
+
+        
+        return
+
     def message(self, head):
         '''
         Concat all h message heads to get Message for each node pair
@@ -115,15 +179,6 @@ class HGT():
         '''
 
 
-        return
-    
-    def messageHead(self, H, W):
-        '''
-        Calculation of Message Head
-        Input:
-         - H - Previous layer input
-         - W - Weight matrix
-        '''
         return
     
     def value(self):
