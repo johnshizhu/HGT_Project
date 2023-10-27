@@ -14,7 +14,7 @@ from torch_geometric.data import HeteroData
 import math
 
 class HGTLayer(MessagePassing):
-    def __init__(self, in_dim, out_dim, num_node_types, num_edge_types, num_heads, use_norm):
+    def __init__(self, in_dim, out_dim, num_node_types, num_edge_types, num_heads, head_dim, use_norm):
         super(HGTLayer, self).__init__()
 
         self.in_dim         = in_dim            # Input dimension
@@ -23,6 +23,11 @@ class HGTLayer(MessagePassing):
         self.num_edge_types = num_edge_types    # Number of Edge Types
         self.num_heads      = num_heads         # Number of Attention Heads
         self.use_norm       = use_norm          # (True/False) Use Normalization
+
+        # Creating Learnable Parameters tensors for relation-specific attention weights
+        self.rel_priority   = nn.Parameter()
+        self.rel_attention  = nn.Parameter(torch.Tensor(num_edge_types, num_heads, head_dim, head_dim))
+        self.rel_message    = nn.Parameter()
 
         # Linear Projections
         self.key_projs      = nn.ModuleList()
@@ -34,12 +39,68 @@ class HGTLayer(MessagePassing):
             self.query_projs.append(nn.Linear(in_dim, out_dim))
             self.value_projs.append(nn.Linear(in_dim, out_dim))
 
-    def forward(self, ):
+    def het_mutal_attention(self, target_node_rep, source_node_rep, key_source_linear, query_source_linear, edge_type_index):
+        '''
+        Heterogeneous Mutual Attention calculation
+        Input:
+         - target_node_rep - Node representation of target
+         - source_node_rep - Node representation of source
+         - key_source_linear - Linear projection of key source
+         - query_source_linear - Linear projection of query source
+         - edge_type_index - edge type 
+        Output:
+         - 
+        '''
+        query_lin = query_source_linear(target_node_rep).view()
+        key_lin = key_source_linear(source_node_rep).view()
+        key_weight = torch.bmm(key_lin.transpose(1,0), self.rel_attention[edge_type_index].transpose(1,0))
+        res_attention = (query_lin * key_weight).
+
+        return
+    
+    def het_message_passing(self):
+
+        return
+    
+    
+    def forward(self):
         return self.propagate()
 
-    def message():
+    def message(self, source_input_node, source_node_type, target_input_node, target_node_type, edge_type, edge_time):
+        '''
+        Pytorch Geometric message function under class MessagePassing
+        Input:
+         - ***_input_node - 
+         - ***_node_type - 
+         - edge_type -         
+        '''
+
+        for source_type_index in range(self.num_node_types):
+            key_source_linear = self.key_projs[source_type_index]
+            value_source_linear = self.key_projs[source_type_index]
+            rel_source = (source_node_type == int(source_type_index))
+
+            for target_type_index in range(self.num_node_types):
+                query_source_linear = self.query_projs[target_type_index]
+                rel_target_source = (target_node_type == int(target_type_index)) & rel_source
+                for edge_type_index in range(self.num_edge_types):
+                    # Meta data relation, AND between relavent source, target, and edge types. 
+                    rel_edge_target_source = (edge_type == int(edge_type_index)) & rel_target_source
+                    
+                    # Get relavent Node representations based on rel_edge_target_source
+                    source_node_rep = source_input_node[rel_edge_target_source]
+                    target_node_rep = target_input_node[rel_edge_target_source]
+
+                    # Heterogenous Mutual Attention
+                    query_rep, key_rep, att_scores = self.het_mutal_attention()
+
+                    # Heterogenous Message Passing
+
+    def update(self):
+        '''
         
-    def update():
+        
+        '''
 
 
 
