@@ -22,6 +22,8 @@ class HGTLayer(MessagePassing):
         self.num_node_types = num_node_types    # Number of Node types
         self.num_edge_types = num_edge_types    # Number of Edge Types
         self.num_heads      = num_heads         # Number of Attention Heads
+        self.head_dim       = out_dim // num_heads
+        self.sqrt_head_dim  = math.sqrt(self.head_dim)
         self.use_norm       = use_norm          # (True/False) Use Normalization
 
         # Creating Learnable Parameters tensors for relation-specific attention weights
@@ -54,9 +56,8 @@ class HGTLayer(MessagePassing):
         query_lin = query_source_linear(target_node_rep).view()
         key_lin = key_source_linear(source_node_rep).view()
         key_weight = torch.bmm(key_lin.transpose(1,0), self.rel_attention[edge_type_index].transpose(1,0))
-        res_attention = (query_lin * key_weight).
-
-        return
+        res_attention = (query_lin * key_weight)  * (self.rel_priority[edge_type_index] / self.sqrt_head_dim)
+        return res_attention
     
     def het_message_passing(self):
 
@@ -74,6 +75,10 @@ class HGTLayer(MessagePassing):
          - ***_node_type - 
          - edge_type -         
         '''
+        # Create Attention Tensor
+        res_attention_tensor = torch.zeros()
+        # Create Message Tensor
+
 
         for source_type_index in range(self.num_node_types):
             key_source_linear = self.key_projs[source_type_index]
@@ -92,7 +97,8 @@ class HGTLayer(MessagePassing):
                     target_node_rep = target_input_node[rel_edge_target_source]
 
                     # Heterogenous Mutual Attention
-                    query_rep, key_rep, att_scores = self.het_mutal_attention()
+                    res_attention = self.het_mutal_attention()
+
 
                     # Heterogenous Message Passing
 
