@@ -7,9 +7,11 @@ Goals:
 - This project is done ONLY for educational purposes
 
 ## Summary and write-up
-Previously, most Graph Neural Networks (GNNs) were designed around homogenous graph structures, where edges and nodes are of all one type. This however is insufficient to represent graphs that have varying node and edge types. 
+Previously, most Graph Neural Networks (GNNs) were designed around homogenous graph structures, where edges and nodes are of all one type. This however is insufficient to represent graphs that have varying node and edge types. HGT is designed the take those essential traits into consideration using the Transformer approach.<br>
+For more information on transformer reference: https://arxiv.org/abs/1706.03762 
 View the full writeup here: https://docs.google.com/document/d/1d9o0fswgC1evu5sxMwIkeSvmzb31Zmho6LytJepAYbs/edit?usp=sharing
 
+Credit for Hetergeneous Graph Transformer goes to the authors of the original paper, Zinui Hu, Yuxiao Dong, Kuansan Wang, and Yizhou Sun
 For original paper and implementation, reference: https://dl.acm.org/doi/fullHtml/10.1145/3366423.3380027
 
 ## Overview
