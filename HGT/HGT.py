@@ -32,14 +32,14 @@ class HGTLayer(MessagePassing):
         self.rel_message    = nn.Parameter()
 
         # Linear Projections
-        self.key_projs      = nn.ModuleList()
-        self.query_projs    = nn.ModuleList()
-        self.value_projs    = nn.ModuleList()
+        self.key_lin_list  = nn.ModuleList()
+        self.query_lin_list= nn.ModuleList()
+        self.value_lin_list= nn.ModuleList()
 
         for i in range(num_node_types):
-            self.key_projs.append(nn.Linear(in_dim, out_dim))
-            self.query_projs.append(nn.Linear(in_dim, out_dim))
-            self.value_projs.append(nn.Linear(in_dim, out_dim))
+            self.key_lin_list.append(nn.Linear(in_dim, out_dim))
+            self.query_lin_list.append(nn.Linear(in_dim, out_dim))
+            self.value_lin_list.append(nn.Linear(in_dim, out_dim))
 
     def het_mutal_attention(self, target_node_rep, source_node_rep, key_source_linear, query_source_linear, edge_type_index):
         '''
@@ -47,27 +47,42 @@ class HGTLayer(MessagePassing):
         Input:
          - target_node_rep - Node representation of target
          - source_node_rep - Node representation of source
-         - key_source_linear - Linear projection of key source
-         - query_source_linear - Linear projection of query source
-         - edge_type_index - edge type 
+         - key_source_linear   - Linear projection of key source    (nn.ModuleList(), looped nn.Linear layers)
+         - query_source_linear - Linear projection of query source  (nn.MOduleList(), looped nn.Linear layers)
+         - edge_type_index - index
+        Output:
+         - res_attention - Tensor storing computed attention coefficients between source and target nodes. 
+        '''
+        # Apply linear layers for Key (source) and Query (target)
+        query_lin_matrix = query_source_linear(target_node_rep).view(-1, self.num_heads, self.head_dim)
+        key_lin_matrix = key_source_linear(source_node_rep).view(-1, self.num_heads, self.head_dim)
+
+        # Calculate Relation Attention with Key matrix
+        key_lin_attention_matrix = torch.bmm(key_lin_matrix.transpose(1,0), self.rel_attention[edge_type_index]).transpose(1,0)
+
+        # Dot product between new Key matrix and query, then include meta relation triplet tensor divided by root of head dim
+        res_attention = (query_lin_matrix * key_lin_attention_matrix).sum(dim = -1) * (self.rel_priority[edge_type_index] / self.sqrt_head_dim)
+        return res_attention
+    
+    def het_message_passing(self, value_source_linear, source_node_rep, edge_type_index):
+        '''
+        Heterogeneous Message Passing
+        Input:
+         - value_source_linear - Linear projection of value source  (nn.ModuleList(), looped nn.Linear layers)
+         - source_node_rep - Node representation of source
+         - edge_type_index - index
         Output:
          - 
         '''
-        query_lin = query_source_linear(target_node_rep).view()
-        key_lin = key_source_linear(source_node_rep).view()
-        key_weight = torch.bmm(key_lin.transpose(1,0), self.rel_attention[edge_type_index].transpose(1,0))
-        res_attention = (query_lin * key_weight)  * (self.rel_priority[edge_type_index] / self.sqrt_head_dim)
-        return res_attention
-    
-    def het_message_passing(self):
-
-        return
-    
+        # Apply Linear Layer
+        value_lin_matrix = value_source_linear(source_node_rep).view(-1, self.num_heads, self.head_dim)
+        res_message = torch.bmm(value_lin_matrix.transpose(1,0), self.rel_message[edge_type_index]).transpose(1,0)
+        return res_message
     
     def forward(self):
         return self.propagate()
 
-    def message(self, source_input_node, source_node_type, target_input_node, target_node_type, edge_type, edge_time):
+    def message(self, edge_index_i, source_input_node, source_node_type, target_input_node, target_node_type, edge_type, edge_time):
         '''
         Pytorch Geometric message function under class MessagePassing
         Input:
@@ -75,32 +90,36 @@ class HGTLayer(MessagePassing):
          - ***_node_type - 
          - edge_type -         
         '''
-        # Create Attention Tensor
-        res_attention_tensor = torch.zeros()
+        # Create Attention Tensor to store attention coefficients between source and target
+        res_attention_tensor = torch.zeros(edge_index_i.size(0), self.num_heads).to(target_input_node.device)
         # Create Message Tensor
-
+        res_message_tensor   = torch.zeros(edge_index_i.size(0), self.num_heads, self.head_dim).to(target_input_node.device)
 
         for source_type_index in range(self.num_node_types):
-            key_source_linear = self.key_projs[source_type_index]
-            value_source_linear = self.key_projs[source_type_index]
+            key_source_linear = self.key_lin_list[source_type_index]
+            value_source_linear = self.value_lin_list[source_type_index]
             rel_source = (source_node_type == int(source_type_index))
 
             for target_type_index in range(self.num_node_types):
-                query_source_linear = self.query_projs[target_type_index]
+                query_source_linear = self.query_lin_list[target_type_index]
                 rel_target_source = (target_node_type == int(target_type_index)) & rel_source
                 for edge_type_index in range(self.num_edge_types):
-                    # Meta data relation, AND between relavent source, target, and edge types. 
-                    rel_edge_target_source = (edge_type == int(edge_type_index)) & rel_target_source
+                    # Meta data relation (edge_type == relation) & (source_type == s) & (target_type == t) 
+                    bool_mask_meta = (edge_type == int(edge_type_index)) & rel_target_source
                     
                     # Get relavent Node representations based on rel_edge_target_source
-                    source_node_rep = source_input_node[rel_edge_target_source]
-                    target_node_rep = target_input_node[rel_edge_target_source]
+                    source_node_rep = source_input_node[bool_mask_meta]
+                    target_node_rep = target_input_node[bool_mask_meta]
 
                     # Heterogenous Mutual Attention
-                    res_attention = self.het_mutal_attention()
-
+                    res_attention = self.het_mutal_attention(self, target_node_rep, source_node_rep, key_source_linear, query_source_linear, edge_type_index)
+                    res_attention_tensor[bool_mask_meta] = res_attention
 
                     # Heterogenous Message Passing
+                    res_message = self.het_message_passing(self, value_source_linear, source_node_rep, edge_type_index)
+                    res_message_tensor[bool_mask_meta] = res_message
+            
+        ''' WORK ON THE SOFTMAX STUFF '''
 
     def update(self):
         '''
