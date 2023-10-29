@@ -27,9 +27,9 @@ class HGTLayer(MessagePassing):
         self.use_norm       = use_norm          # (True/False) Use Normalization
 
         # Creating Learnable Parameters tensors for relation-specific attention weights
-        self.rel_priority   = nn.Parameter()
-        self.rel_attention  = nn.Parameter(torch.Tensor(num_edge_types, num_heads, head_dim, head_dim))
-        self.rel_message    = nn.Parameter()
+        self.rel_priority   = nn.Parameter(torch.ones(self.num_edge_types, self.num_heads))
+        self.rel_attention  = nn.Parameter(torch.Tensor(self.num_edge_types, self.num_heads, self.head_dim, self.head_dim))
+        self.rel_message    = nn.Parameter(torch.Tensor(self.num_edge_types, self.num_heads, self.head_dim, self.head_dim))
 
         # Linear Projections
         self.key_lin_list  = nn.ModuleList()
