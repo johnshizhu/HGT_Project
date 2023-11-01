@@ -157,7 +157,5 @@ class HGTLayer(MessagePassing):
     def update(self, aggregated_output, node_input, node_type):
         '''
         Pytorch Geometric Update Function
-        
-        
         '''
-        return
+        return self.target_specific_aggregation(aggregated_output, node_input, node_type)
