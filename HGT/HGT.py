@@ -25,6 +25,7 @@ class HGTLayer(MessagePassing):
         self.head_dim       = out_dim // num_heads
         self.sqrt_head_dim  = math.sqrt(self.head_dim)
         self.use_norm       = use_norm          # (True/False) Use Normalization
+        self.attention      = None
 
         # Creating Learnable Parameters tensors for relation-specific attention weights
         self.rel_priority   = nn.Parameter(torch.ones(self.num_edge_types, self.num_heads))
@@ -79,6 +80,13 @@ class HGTLayer(MessagePassing):
         res_message = torch.bmm(value_lin_matrix.transpose(1,0), self.rel_message[edge_type_index]).transpose(1,0)
         return res_message
     
+    def target_specific_aggregation(self):
+        '''
+        Target Specific Aggregation
+        
+        '''
+        return
+    
     def forward(self):
         return self.propagate()
 
@@ -120,6 +128,11 @@ class HGTLayer(MessagePassing):
                     res_message_tensor[bool_mask_meta] = res_message
             
         ''' WORK ON THE SOFTMAX STUFF '''
+        self.attention = softmax(res_attention_tensor, edge_index_i)
+        result = res_message_tensor * self.attention.view(-1, self.num_heads, 1)
+
+        return result.view(-1, self.out_dim)
+
 
     def update(self):
         '''
