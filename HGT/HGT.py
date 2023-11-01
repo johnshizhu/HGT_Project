@@ -31,16 +31,21 @@ class HGTLayer(MessagePassing):
         self.rel_priority   = nn.Parameter(torch.ones(self.num_edge_types, self.num_heads))
         self.rel_attention  = nn.Parameter(torch.Tensor(self.num_edge_types, self.num_heads, self.head_dim, self.head_dim))
         self.rel_message    = nn.Parameter(torch.Tensor(self.num_edge_types, self.num_heads, self.head_dim, self.head_dim))
+        self.skip           = nn.Parameter(torch.ones(num_node_types))
+        self.drop           = nn.Dropout(0.2) # Drop out of 0.2
+
 
         # Linear Projections
-        self.key_lin_list  = nn.ModuleList()
-        self.query_lin_list= nn.ModuleList()
-        self.value_lin_list= nn.ModuleList()
+        self.key_lin_list   = nn.ModuleList()
+        self.query_lin_list = nn.ModuleList()
+        self.value_lin_list = nn.ModuleList()
+        self.agg_lin_list   = nn.ModuleList()
 
         for i in range(num_node_types):
             self.key_lin_list.append(nn.Linear(in_dim, out_dim))
             self.query_lin_list.append(nn.Linear(in_dim, out_dim))
             self.value_lin_list.append(nn.Linear(in_dim, out_dim))
+            self.agg_lin_list.append(nn.Linear(out_dim, out_dim))
 
     def het_mutal_attention(self, target_node_rep, source_node_rep, key_source_linear, query_source_linear, edge_type_index):
         '''
@@ -80,15 +85,31 @@ class HGTLayer(MessagePassing):
         res_message = torch.bmm(value_lin_matrix.transpose(1,0), self.rel_message[edge_type_index]).transpose(1,0)
         return res_message
     
-    def target_specific_aggregation(self):
+    def target_specific_aggregation(self, aggregated_output, node_input, node_type):
         '''
         Target Specific Aggregation
-        
+        x = W[node_type] * gelu(Agg(X)) + x
+        Inputs:
+        - aggregated_output - output of previous aggregation step
+        - node_input - original node input features
+        - node_type - the type of the node
         '''
-        return
+        # GELU activation
+        gelu_ag_out = nn.functional.gelu(aggregated_output)
+        result = torch.zeros(aggregated_output.size(0), self.out_dim)
+        for target_type in range(self.num_node_types):
+            index = (node_type == int(target_type))
+            if index.sum() == 0:
+                continue
+            # Applying dropout
+            trans_out = self.drop(self.agg_lin_list[target_type](gelu_ag_out[index]))
+            # Adding skip connection with learnable weight 
+            skip_con = torch.sigmoid(self.skip[target_type])
+            result[index] = trans_out *  skip_con + node_input[index] * (1 - trans_out)
+        return result
     
-    def forward(self):
-        return self.propagate()
+    def forward(self, node_input, node_type, edge_index, edge_type, edge_time):
+        return self.propagate(edge_index, node_input=node_input, node_type=node_type, edge_type=edge_type)
 
     def message(self, edge_index_i, source_input_node, source_node_type, target_input_node, target_node_type, edge_type, edge_time):
         '''
@@ -127,192 +148,16 @@ class HGTLayer(MessagePassing):
                     res_message = self.het_message_passing(self, value_source_linear, source_node_rep, edge_type_index)
                     res_message_tensor[bool_mask_meta] = res_message
             
-        ''' WORK ON THE SOFTMAX STUFF '''
+        # Softmax Output
         self.attention = softmax(res_attention_tensor, edge_index_i)
         result = res_message_tensor * self.attention.view(-1, self.num_heads, 1)
-
+        # Possible to delete tensors from memory
         return result.view(-1, self.out_dim)
 
-
-    def update(self):
+    def update(self, aggregated_output, node_input, node_type):
         '''
+        Pytorch Geometric Update Function
         
         
         '''
-
-
-
-
-class HGT():
-    '''
-    Attention --> estimates the importance of each source node
-    Message --> extracts the message by using only the source node s
-    Aggregate --> aggregates neighborhood message by attention weight
-    '''
-    def __init__(self, input_graph):
-        '''
-        Input
-         - input_graph (Pytorch_Geometric Heterogeneous Graph object)
-        '''
-        self.graph = input_graph
-        return
-    
-    def layer(self):
-        '''
-
-        '''
-
-        return
-
-    # Heterogeneous Mutual Attention
-
-    def key_linear(self, in_dim, out_dim, num_types):
-        '''
-        Projection of the source node
-        Qi(s) = Q-Linear (H^l-1[s])
-        Input:
-         - in_dim - dimension of input node features H^l-1[s] --> d
-         - out_dim - output dimension, d/h, h is head cout
-         - num_types - number of types
-        Output:
-         - output - Linear projection of key
-        '''
-        key_linears = nn.ModuleList()
-        for i in range(num_types):
-            key_linears.append(nn.Linear(in_dim, out_dim))
-        return key_linears
-    
-    def query_linear(self, in_dim, out_dim, num_types):
-        '''
-        Projection of the TARGET node
-        Qi(t) = Q-Linear (H^l-1[t])
-        Input:
-         - in_dim - dimension of input node features H^l-1[s] --> d
-         - out_dim - output dimension d/h, h is head count
-         - num_types - number of types
-        Output:
-         - output - Linear projection of query
-        '''
-        query_linears = nn.ModuleList()
-        for i in range(num_types):
-            query_linears.append(nn.Linear(in_dim, out_dim))
-        return query_linears
-    
-    def attentionHead(self, key, W, query, mu, d):
-        '''
-        Heterogeneous Mutual Attention HEAD calculation
-               
-        Input:
-         - key - Linear project of key
-         - W - distinct edge-based weight matrix for each edge type
-         - query - Linear projection of query
-         - mu - meta relation triplet information of shape (number of node types, number of edge relations, number of node types)
-         - d - dimension of the key and query vectors
-        Output:
-         - attention - Scalar value representing the unnormalized attention score predicted by attention head
-        '''
-        # Transpose of query
-        t_query = torch.t(query)
-
-        # Dot product key, weight, query_transpose (left side)
-        temp = torch.dot(key, W)
-        left = torch.dot(temp, t_query)
-
-        # right hand side meta relation
-        right = mu/math.sqrt(d)
-
-        # element wise multiplication
-        return left * right
-
-    
-    def attention(self, h, s, e, t):
-        '''
-        Attention Calculation
-        Inputs:
-         - h - Number of attention heads
-         - s - Source node
-         - e - edge type between source and target
-         - t - target node
-        Outputs:
-         - attention - vector of attention score between s and t w/ respect to all neighbors
-        '''
-
-
-        return
-    
-    # Heterogeneous Message Passing - pass info from source nodes to target nodes
-
-    def value_linear(self, in_dim, out_dim, num_types, ):
-        '''
-        Projection of the sources node(s)
-        Qi(t) = Q-Linear (H^l-1[t])
-        Input:
-         - in_dim - dimension of input node features H^l-1[s] --> d
-         - out_dim - output dimension d/h, h is head count
-         - num_types - number of types
-        Output:
-         - output - Linear projection of query
-        '''
-        value_linears = nn.ModuleList()
-        for i in range(num_types):
-            value_linears.append(nn.Linear(in_dim, out_dim))
-        return value_linears
-
-    def messageHead(self, H, W):
-        '''
-        Calculation of Message Head
-        Input:
-         - H - Previous layer input
-         - W - Weight matrix
-        Output:
-         - head - Linear Projection 
-        '''
-
-        
-        return
-
-    def message(self, head):
-        '''
-        Concat all h message heads to get Message for each node pair
-        
-        '''
-
-
-        return
-    
-    def value(self):
-        '''
-        Linear Projection of source node s into ith message vector
-        '''
-        # POssible object oriented approach to this instead????
-        Qv = nn.Linear()
-
-        return
-    
-    # Target Specific Aggregation
-
-    def aggregate(self, attention, message_passing, res_con):
-        '''
-        Target Specific Aggregation
-
-        Input:
-         - attention - Heterogeneous Mutual Attention
-         - message_passing - Heterogeneous Message Passing
-         - res_con - Residual connection
-        Output:
-         - aggregate
-        
-        '''
-        # Element Wise Multiplication
-
-        # Element Wise Addition
-
-        # Activation
-
-        # Linear Layer
-
-        # Element wise Addition w/ Residual Connection
-
-        # aggregate = 
-
         return
