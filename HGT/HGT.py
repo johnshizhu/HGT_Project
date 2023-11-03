@@ -14,7 +14,7 @@ from torch_geometric.data import HeteroData
 import math
 
 class HGTLayer(MessagePassing):
-    def __init__(self, in_dim, out_dim, num_node_types, num_edge_types, num_heads, head_dim, use_norm):
+    def __init__(self, in_dim, out_dim, num_node_types, num_edge_types, num_heads, use_norm):
         super(HGTLayer, self).__init__()
 
         self.in_dim         = in_dim            # Input dimension
