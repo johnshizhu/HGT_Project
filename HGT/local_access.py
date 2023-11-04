@@ -1,7 +1,8 @@
 '''
 Access Dataset locally
 Download Dataset using Microsoft Academic dataset
-../HGT_Data/dataset/ogbn_mag/processed/geometric_data_processed.pt
+../HGT_Data/dataset/ogbn_mag/processed/geometric_data_processed.pt\
+Loading a pytorch geometric object
 '''
 import torch
 import torch_geometric as pyg

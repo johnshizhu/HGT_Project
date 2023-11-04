@@ -23,7 +23,3 @@ class Loader():
         self.valid = valid_idx
         self.test = test_idx
         return
-    
-    def get_embedding(self):
-        
-        return
