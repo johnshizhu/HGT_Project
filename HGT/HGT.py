@@ -194,7 +194,7 @@ class HGTModel(nn.Module):
         # Apply dropout
         post_drop = self.drop(result)
         del result # clear
-        for layer in self.hgtlayers:
-            post_drop = layer(post_drop, node_type, edge_index, edge_type, edge_time)
+        for layer in self.hgt_layers:
+            post_drop = layer(post_drop, node_type, edge_index, edge_type)
         return post_drop
 
