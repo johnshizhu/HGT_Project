@@ -34,7 +34,6 @@ class HGTLayer(MessagePassing):
         self.skip           = nn.Parameter(torch.ones(num_node_types))
         self.drop           = nn.Dropout(0.2) # Drop out of 0.2
 
-
         # Linear Projections
         self.key_lin_list   = nn.ModuleList()
         self.query_lin_list = nn.ModuleList()
@@ -115,9 +114,9 @@ class HGTLayer(MessagePassing):
         '''
         Pytorch Geometric message function under class MessagePassing
         Input:
-         - ***_input_node - 
-         - ***_node_type - 
-         - edge_type -         
+         - ***_input_node - source/target input node embedding
+         - ***_node_type - source/target input node type
+         - edge_type - edge type between two nodes 
         '''
         # Create Attention Tensor to store attention coefficients between source and target
         res_attention_tensor = torch.zeros(edge_index_i.size(0), self.num_heads).to(target_input_node.device)
@@ -159,3 +158,43 @@ class HGTLayer(MessagePassing):
         Pytorch Geometric Update Function
         '''
         return self.target_specific_aggregation(aggregated_output, node_input, node_type)
+
+class HGTModel(nn.Module):
+    def __init__(self, input_dim, hidden_dim, num_node_types, num_edge_types, num_heads, num_layers, dropout):
+        super(HGTModel, self).__init__()
+        self.input_dim      = input_dim
+        self.hidden_dim     = hidden_dim
+        self.num_node_types = num_node_types
+        self.num_edge_types = num_edge_types
+        self.num_heads      = num_heads
+        self.num_layers     = num_layers
+
+        # ModuleList and Dropout
+        self.adapt_features = nn.ModuleList()
+        self.hgt_layers = nn.ModuleList()
+        self.drop  = nn.Dropout(dropout)
+
+        # Creating common representation of Features
+        for i in range(num_node_types):
+            self.adapt_features.append(nn.Linear(input_dim, hidden_dim))
+        for j in range(num_layers - 1):
+            self.hgt_layers.append(HGTLayer(input_dim, hidden_dim, num_node_types, num_edge_types, num_heads, False))
+        # Last layer
+        self.hgt_layers.append(HGTLayer(input_dim, hidden_dim, num_node_types, num_edge_types, num_heads, False))
+
+    def forward(self, node_feature, node_type, edge_time, edge_index, edge_type):
+        result = torch.zeros(node_feature.size(0), self.hidden_dim)
+        for node_type_index in range(self.num_node_types):
+            index = (node_type == int(node_type_index))
+            if index.sum() == 0:
+                continue
+            # tanh activation applied to adapted node features
+            result[index] = torch.tanh(self.adapt_features[node_type_index](node_feature[index]))
+        
+        # Apply dropout
+        post_drop = self.drop(result)
+        del result # clear
+        for layer in self.hgtlayers:
+            post_drop = layer(post_drop, node_type, edge_index, edge_type, edge_time)
+        return post_drop
+
