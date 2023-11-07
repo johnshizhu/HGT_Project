@@ -10,6 +10,7 @@ import torch_geometric as pyg
 class Local_Access():
     def __init__(self, file_path):
         input_data = torch.load(file_path)
+        self.input_data = input_data
         data_zero = input_data[0]
         self.data = input_data[0]                        # The data loaded with torch.load as a tuple
         self.num_nodes_dict = data_zero.num_nodes_dict   # number of nodes of each type
@@ -18,6 +19,9 @@ class Local_Access():
         self.node_year = data_zero.node_year             # publication year for each paper
         self.edge_reltype = data_zero.edge_reltype       # edge types
         self.y_dict = data_zero.y_dict                   # target labels
+
+    def get_input_data(self):
+        return self.input_data
 
     def get_data(self):
         return self.data

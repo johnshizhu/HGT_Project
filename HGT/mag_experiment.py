@@ -5,7 +5,7 @@ This code opens the Microsoft Academic Graph Dataset and trains HGT
 import torch
 from hgt import *
 from local_access import *
-from torch_geometric.data import HeteroData
+from torch_geometric.loader import DataLoader
 
 print("Microsoft Academic Graph Dataset Experiment")
 print("")
@@ -37,9 +37,18 @@ model = HGTModel(input_dim,
                  num_heads, 
                  num_layers, 
                  dropout = 0.2)
+print("")
+print(f'Model is: {model}')
+print("")
 
-print("Model Compiled")
-print(model)
+optimizer = torch.optim.Adam(model.parameters(), lr = 0.01)
+print(f'Optimizer is: {optimizer}')
+print("")
+
+loader = DataLoader(local_data.get_data(), batch_size = 32, shuffle = True)
+print(f'Dataloader is: {loader}')
+print("")
+
 
 
 
