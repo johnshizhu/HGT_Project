@@ -11,9 +11,9 @@ from torch_geometric.data import DataLoader
 
 class Loader():
 
-    def __init__(self):
-        print('Loading dataset Microsoft Academic Graph')
-        dataset = PygNodePropPredDataset(name='ogbn-arxiv')
+    def __init__(self, dataset_name):
+        print(f'Loading dataset: {dataset_name}')
+        dataset = PygNodePropPredDataset(name=dataset_name)
         print('Completed Loading, now splitting Data')
         split_idx = dataset.get_idx_split()
         train_idx, valid_idx, test_idx = split_idx["train"], split_idx["valid"], split_idx["test"]

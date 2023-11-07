@@ -2,15 +2,10 @@
 Implementation of Heterogeneous Graph Transformer (HGT)
 Refer to section 3 of HGT
 '''
-from ogb_load import Loader
-from local_access import Local_Access
 import torch
-import numpy as np
 import torch.nn as nn
-from torch_geometric.nn import GATConv
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.utils import softmax
-from torch_geometric.data import HeteroData
 import math
 
 class HGTLayer(MessagePassing):
@@ -50,11 +45,11 @@ class HGTLayer(MessagePassing):
         '''
         Heterogeneous Mutual Attention calculation
         Input:
-         - target_node_rep - Node representation of target
-         - source_node_rep - Node representation of source
-         - key_source_linear   - Linear projection of key source    (nn.ModuleList(), looped nn.Linear layers)
-         - query_source_linear - Linear projection of query source  (nn.MOduleList(), looped nn.Linear layers)
-         - edge_type_index - index
+         - target_node_rep      - Node representation of target
+         - source_node_rep      - Node representation of source
+         - key_source_linear    - Linear projection of key source    (nn.ModuleList(), looped nn.Linear layers)
+         - query_source_linear  - Linear projection of query source  (nn.MOduleList(), looped nn.Linear layers)
+         - edge_type_index      - index
         Output:
          - res_attention - Tensor storing computed attention coefficients between source and target nodes. 
         '''
@@ -73,9 +68,9 @@ class HGTLayer(MessagePassing):
         '''
         Heterogeneous Message Passing
         Input:
-         - value_source_linear - Linear projection of value source  (nn.ModuleList(), looped nn.Linear layers)
-         - source_node_rep - Node representation of source
-         - edge_type_index - index
+         - value_source_linear   - Linear projection of value source  (nn.ModuleList(), looped nn.Linear layers)
+         - source_node_rep       - Node representation of source
+         - edge_type_index       - index
         Output:
          - 
         '''
@@ -90,8 +85,10 @@ class HGTLayer(MessagePassing):
         x = W[node_type] * gelu(Agg(X)) + x
         Inputs:
         - aggregated_output - output of previous aggregation step
-        - node_input - original node input features
-        - node_type - the type of the node
+        - node_input        - original node input features
+        - node_type         - the type of the node
+        Output:
+        - result            - Aggregated value of attention + message
         '''
         # GELU activation
         gelu_ag_out = nn.functional.gelu(aggregated_output)
@@ -159,6 +156,19 @@ class HGTLayer(MessagePassing):
         '''
         return self.target_specific_aggregation(aggregated_output, node_input, node_type)
 
+
+
+'''
+Implementation of Heterogeneous Graph Transformer Model using multiple HGT layers
+Inputs:
+ - input_dim        - input dimension
+ - hidden_dim       - hidden dimension
+ - num_node_types   - number of types of nodes
+ - num_edge_types   - number of types of edges
+ - num_heads        - number of attention heads per layer
+ - num_layers       - number of layers
+ - dropout          - dropout rate
+'''
 class HGTModel(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_node_types, num_edge_types, num_heads, num_layers, dropout):
         super(HGTModel, self).__init__()
