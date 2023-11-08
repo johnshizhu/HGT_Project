@@ -6,10 +6,12 @@ import torch
 import torch.nn as nn
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.utils import softmax
+from torch_geometric.nn.inits import glorot
+from rte import RTE
 import math
 
 class HGTLayer(MessagePassing):
-    def __init__(self, in_dim, out_dim, num_node_types, num_edge_types, num_heads, use_norm):
+    def __init__(self, in_dim, out_dim, num_node_types, num_edge_types, num_heads, use_norm, use_rte):
         super(HGTLayer, self).__init__()
 
         self.in_dim         = in_dim            # Input dimension
@@ -20,6 +22,7 @@ class HGTLayer(MessagePassing):
         self.head_dim       = out_dim // num_heads
         self.sqrt_head_dim  = math.sqrt(self.head_dim)
         self.use_norm       = use_norm          # (True/False) Use Normalization
+        self.use_rte        = use_rte           # (True/False) Use Relative Temporal Encoding
         self.attention      = None
 
         # Creating Learnable Parameters tensors for relation-specific attention weights
@@ -28,6 +31,14 @@ class HGTLayer(MessagePassing):
         self.rel_message    = nn.Parameter(torch.Tensor(self.num_edge_types, self.num_heads, self.head_dim, self.head_dim))
         self.skip           = nn.Parameter(torch.ones(num_node_types))
         self.drop           = nn.Dropout(0.2) # Drop out of 0.2
+
+        # glorot initialization
+        glorot(self.rel_attention)
+        glorot(self.rel_message)
+
+        # Relative Temporal Encoding
+        if self.use_rte:
+            self.emb        = RTE(in_dim)
 
         # Linear Projections
         self.key_lin_list   = nn.ModuleList()
@@ -105,7 +116,7 @@ class HGTLayer(MessagePassing):
         return result
     
     def forward(self, node_input, node_type, edge_index, edge_type, edge_time):
-        return self.propagate(edge_index, node_input=node_input, node_type=node_type, edge_type=edge_type)
+        return self.propagate(edge_index, node_input=node_input, node_type=node_type, edge_type=edge_type, edge_time = edge_time)
 
     def message(self, edge_index_i, source_input_node, source_node_type, target_input_node, target_node_type, edge_type, edge_time):
         '''
@@ -131,10 +142,16 @@ class HGTLayer(MessagePassing):
                 for edge_type_index in range(self.num_edge_types):
                     # Meta data relation (edge_type == relation) & (source_type == s) & (target_type == t) 
                     bool_mask_meta = (edge_type == int(edge_type_index)) & rel_target_source
-                    
+                    if bool_mask_meta.sum() == 0:
+                        continue
+
                     # Get relavent Node representations based on rel_edge_target_source
                     source_node_rep = source_input_node[bool_mask_meta]
                     target_node_rep = target_input_node[bool_mask_meta]
+
+                    # Relative Temporal Encoding option
+                    if self.use_rte:
+                        source_node_rep = self.emb(source_node_rep, edge_time[bool_mask_meta])
 
                     # Heterogenous Mutual Attention
                     res_attention = self.het_mutal_attention(self, target_node_rep, source_node_rep, key_source_linear, query_source_linear, edge_type_index)
@@ -147,7 +164,8 @@ class HGTLayer(MessagePassing):
         # Softmax Output
         self.attention = softmax(res_attention_tensor, edge_index_i)
         result = res_message_tensor * self.attention.view(-1, self.num_heads, 1)
-        # Possible to delete tensors from memory
+        # Delete tensors from memory
+        del res_attention_tensor, res_message_tensor
         return result.view(-1, self.out_dim)
 
     def update(self, aggregated_output, node_input, node_type):
@@ -170,7 +188,7 @@ Inputs:
  - dropout          - dropout rate
 '''
 class HGTModel(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_node_types, num_edge_types, num_heads, num_layers, dropout):
+    def __init__(self, input_dim, hidden_dim, num_node_types, num_edge_types, num_heads, num_layers, dropout, prev_norm = False, last_norm = False, use_rte = True):
         super(HGTModel, self).__init__()
         self.input_dim      = input_dim
         self.hidden_dim     = hidden_dim
@@ -188,9 +206,9 @@ class HGTModel(nn.Module):
         for i in range(num_node_types):
             self.adapt_features.append(nn.Linear(input_dim, hidden_dim))
         for j in range(num_layers - 1):
-            self.hgt_layers.append(HGTLayer(input_dim, hidden_dim, num_node_types, num_edge_types, num_heads, False))
+            self.hgt_layers.append(HGTLayer(input_dim, hidden_dim, num_node_types, num_edge_types, num_heads, prev_norm, use_rte))
         # Last layer
-        self.hgt_layers.append(HGTLayer(input_dim, hidden_dim, num_node_types, num_edge_types, num_heads, False))
+        self.hgt_layers.append(HGTLayer(input_dim, hidden_dim, num_node_types, num_edge_types, num_heads, last_norm, use_rte))
 
     def forward(self, node_feature, node_type, edge_time, edge_index, edge_type):
         result = torch.zeros(node_feature.size(0), self.hidden_dim)
@@ -205,6 +223,6 @@ class HGTModel(nn.Module):
         post_drop = self.drop(result)
         del result # clear
         for layer in self.hgt_layers:
-            post_drop = layer(post_drop, node_type, edge_index, edge_type)
+            post_drop = layer(post_drop, node_type, edge_index, edge_type, edge_time)
         return post_drop
 

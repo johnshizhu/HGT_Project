@@ -13,7 +13,7 @@ class RTE(nn.Module):
      - hidden_dim - 
      - max_encode -  
     '''
-    def __init__(self, hidden_dim, max_encode):
+    def __init__(self, hidden_dim, max_encode = 240):
         super(RTE, self).__init__()
         # Create tensor of 1,2,3,..., max_encode-1
         position = torch.arange(0., max_encode, hidden_dim).unsqueeze(1)
