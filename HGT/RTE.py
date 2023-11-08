@@ -16,7 +16,7 @@ class RTE(nn.Module):
     def __init__(self, hidden_dim, max_encode = 240):
         super(RTE, self).__init__()
         # Create tensor of 1,2,3,..., max_encode-1
-        position = torch.arange(0., max_encode, hidden_dim).unsqueeze(1)
+        position = torch.arange(0., max_encode).unsqueeze(1)
         generate_sin = torch.exp(torch.arange(0, hidden_dim, 2) * -(math.log(10000.0) / hidden_dim))
         embedding = nn.Embedding(max_encode, hidden_dim)
         embedding.weight.data[:, 0::2] = torch.sin(position * generate_sin) / math.sqrt(hidden_dim)

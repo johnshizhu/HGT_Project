@@ -244,4 +244,4 @@ class Classifier(nn.Module):
         return torch.log_softmax(tx.squeeze(), dim=-1)
     def __repr__(self):
         return '{}(n_hid={}, n_out={})'.format(
-            self.__class__.__name__, self.n_hid, self.n_out)
+            self.__class__.__name__, self.hidden_dim, self.output_dim)
