@@ -45,12 +45,15 @@ class HGTLayer(MessagePassing):
         self.query_lin_list = nn.ModuleList()
         self.value_lin_list = nn.ModuleList()
         self.agg_lin_list   = nn.ModuleList()
+        self.normalize      = nn.ModuleList()
 
         for i in range(num_node_types):
             self.key_lin_list.append(nn.Linear(in_dim, out_dim))
             self.query_lin_list.append(nn.Linear(in_dim, out_dim))
             self.value_lin_list.append(nn.Linear(in_dim, out_dim))
             self.agg_lin_list.append(nn.Linear(out_dim, out_dim))
+            if use_norm:
+                self.normalize.append(nn.LayerNorm(out_dim))
 
     def het_mutal_attention(self, target_node_rep, source_node_rep, key_source_linear, query_source_linear, edge_type_index):
         '''
@@ -112,7 +115,11 @@ class HGTLayer(MessagePassing):
             trans_out = self.drop(self.agg_lin_list[target_type](gelu_ag_out[index]))
             # Adding skip connection with learnable weight 
             skip_con = torch.sigmoid(self.skip[target_type])
-            result[index] = trans_out *  skip_con + node_input[index] * (1 - trans_out)
+
+            if self.use_norm:
+                result[index] = self.normalize[target_type](trans_out * skip_con + node_input[index] * (1-skip_con))
+            else:
+                result[index] = trans_out *  skip_con + node_input[index] * (1 - trans_out)
         return result
     
     def forward(self, node_input, node_type, edge_index, edge_type, edge_time):
@@ -226,3 +233,15 @@ class HGTModel(nn.Module):
             post_drop = layer(post_drop, node_type, edge_index, edge_type, edge_time)
         return post_drop
 
+class Classifier(nn.Module):
+    def __init__(self, hidden_dim, output_dim):
+        super(Classifier, self).__init__()
+        self.hidden_dim    = hidden_dim
+        self.output_dim    = output_dim
+        self.linear        = nn.Linear(hidden_dim,  output_dim)
+    def forward(self, x):
+        tx = self.linear(x)
+        return torch.log_softmax(tx.squeeze(), dim=-1)
+    def __repr__(self):
+        return '{}(n_hid={}, n_out={})'.format(
+            self.__class__.__name__, self.n_hid, self.n_out)
