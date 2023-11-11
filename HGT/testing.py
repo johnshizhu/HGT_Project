@@ -1,8 +1,6 @@
-from local_access import Local_Access
-import os
 import torch
 from hgt import *
-from torch_geometric.data import HeteroData
+from model import HGTModel
 
 # Create a simple graph
 x = torch.randn(10, 128) # 10 nodes, 128 input features
@@ -16,16 +14,18 @@ y = torch.randint(0, 2, (10,)) # binary target
 
 # Model
 model = HGTModel(128, 64, 1, 1, 2, 1, 0.5) 
-classifier = Classifier(64, 2)
+# classifier = Classifier(64, 2)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 criterion = torch.nn.NLLLoss()
 
+print(model)
+
 # Single training iteration
 out = model(x, node_type, edge_time, edge_index, edge_type)
-out = classifier(out)
-loss = criterion(out, y)
-loss.backward()
-optimizer.step()
+# out = classifier(out)
+# loss = criterion(out, y)
+# loss.backward()
+# optimizer.step()
 
-print("Loss:", loss.item())
+# print("Loss:", loss.item())
