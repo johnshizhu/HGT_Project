@@ -3,6 +3,134 @@ import scipy.sparse as sp
 import torch
 from collections import defaultdict
 
+def prepare_graph(data, dataset):
+    # Populating edge lists in Graph object based on edge_list
+    print("Populating edge lists into Graph object")
+    edge_index_dict = data.edge_index_dict 
+    graph = Graph()
+    edg = graph.edge_list
+    years = data.node_year['paper'].t().numpy()[0]
+    # for every type of edge relation i.e. ('author', 'affiliated_with', 'institution'), ...
+    for key in edge_index_dict:
+        print(key) # print relation name
+        edges = edge_index_dict[key] 
+        '''
+        tensor( [[      0,       1,       2,  ..., 1134645, 1134647, 1134648],
+                [    845,     996,    3197,  ...,    5189,    4668,    4668]]) example edges tensor
+        '''
+        # getting types of source, relation and edge ('author', 'affiliated_with', 'institution')
+        s_type, r_type, t_type = key[0], key[1], key[2]
+        elist = edg[t_type][s_type][r_type]
+        rlist = edg[s_type][t_type]['rev_' + r_type]
+        # adding year if the type is paper
+        for s_id, t_id in edges.t().tolist():
+            year = None
+            if s_type == 'paper':
+                year = years[s_id]
+            elif t_type == 'paper':
+                year = years[t_id]
+            elist[t_id][s_id] = year
+            rlist[s_id][t_id] = year
+
+    print("")
+    # Reformatting edge list and computing node degrees
+    print("Reformatting edge lists and computing node degrees")
+    edg = {}
+    deg = {key : np.zeros(data.num_nodes_dict[key]) for key in data.num_nodes_dict}
+    for k1 in graph.edge_list:
+        if k1 not in edg:
+            edg[k1] = {}
+        for k2 in graph.edge_list[k1]:
+            if k2 not in edg[k1]:
+                edg[k1][k2] = {}
+            for k3 in graph.edge_list[k1][k2]:
+                if k3 not in edg[k1][k2]:
+                    edg[k1][k2][k3] = {}
+                for e1 in graph.edge_list[k1][k2][k3]:
+                    if len(graph.edge_list[k1][k2][k3][e1]) == 0:
+                        continue
+
+                    edg[k1][k2][k3][e1] = {}
+                    for e2 in graph.edge_list[k1][k2][k3][e1]:
+                        edg[k1][k2][k3][e1][e2] = graph.edge_list[k1][k2][k3][e1][e2]
+                    deg[k1][e1] += len(edg[k1][k2][k3][e1])
+                print(k1, k2, k3, len(edg[k1][k2][k3]))
+    graph.edge_list = edg # inserting new edge list into Graph object
+
+    print("")
+    # Constructing node feature vectors for each node type in graph
+    print("Constructing node feature vectors for each node type in graph")
+    paper_node_features = data.x_dict['paper'].numpy() # data into numpy
+    # append log degree to get full paper node features
+    graph.node_feature['paper'] = np.concatenate((paper_node_features, np.log10(deg['paper'].reshape(-1, 1))), axis=-1)
+    # These are node types: {'author': 1134649, 'field_of_study': 59965, 'institution': 8740, 'paper': 736389}
+    for node_type in data.num_nodes_dict:
+        print(node_type)
+        if node_type not in ['paper', 'institution']:
+            i = []
+            for rel_type in graph.edge_list[node_type]['paper']:
+                for t in graph.edge_list[node_type]['paper'][rel_type]:
+                    for s in graph.edge_list[node_type]['paper'][rel_type][t]:
+                        i += [[t,s]]
+                if len(i) == 0:
+                    continue
+            i = np.array(i).T
+            v = np.ones(i.shape[1])
+            m = normalize(sp.coo_matrix((v, i), \
+                shape=(data.num_nodes_dict[node_type], data.num_nodes_dict['paper'])))
+            out = m.dot(paper_node_features)
+            graph.node_feature[node_type] = np.concatenate((out, np.log10(deg[node_type].reshape(-1, 1))), axis=-1)
+
+    print("")
+    # Contructing node feature vectors for institution nodes
+    print("Constructing Node features for institutions")    
+    cv = graph.node_feature['author'][:, :-1]
+    i = []
+    for _rel in graph.edge_list['institution']['author']:
+        for j in graph.edge_list['institution']['author'][_rel]:
+            for t in graph.edge_list['institution']['author'][_rel][j]:
+                i += [[j, t]]
+    i = np.array(i).T
+    v = np.ones(i.shape[1])
+    m = normalize(sp.coo_matrix((v, i), \
+        shape=(data.num_nodes_dict['institution'], data.num_nodes_dict['author'])))
+    out = m.dot(cv)
+    graph.node_feature['institution'] = np.concatenate((out, np.log10(deg['institution'].reshape(-1, 1))), axis=-1)      
+
+    # y_dict
+    y = data.y_dict['paper'].t().numpy()[0]
+
+    print("")
+    # Splitting dataset into training, validation and testing
+    print("Splitting dataset into train, val and test")
+    split_idx = dataset.get_idx_split()
+    train_paper = split_idx['train']['paper'].numpy()
+    valid_paper = split_idx['valid']['paper'].numpy()
+    test_paper  = split_idx['test']['paper'].numpy()
+
+    graph.y = y
+    graph.train_paper = train_paper
+    graph.valid_paper = valid_paper
+    graph.test_paper  = test_paper
+    graph.years       = years
+
+    print("")
+    print("Creating Masks")
+    graph.train_mask = np.zeros(len(graph.node_feature['paper']), dtype=bool)
+    graph.train_mask[graph.train_paper] = True
+
+    graph.valid_mask = np.zeros(len(graph.node_feature['paper']), dtype=bool)
+    graph.valid_mask[graph.valid_paper] = True
+
+    graph.test_mask = np.zeros(len(graph.node_feature['paper']),  dtype=bool)
+    graph.test_mask[graph.test_paper] = True
+
+    print("")
+    # Preprocessing graph object is now complete
+    print("Preprocessing complete")
+
+    return graph, y, train_paper, valid_paper, test_paper
+
 def normalize(mx):
     """Row-normalize sparse matrix"""
     rowsum = np.array(mx.sum(1))
@@ -236,7 +364,7 @@ class Graph():
     def __init__(self):
         super(Graph, self).__init__()
         '''
-            node_forward and bacward are only used when building the data. 
+            node_forward and backward are only used when building the data. 
             Afterwards will be transformed into node_feature by DataFrame
             
             node_forward: name -> node_id
