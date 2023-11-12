@@ -14,7 +14,7 @@ Inputs:
  - dropout          - dropout rate
 '''
 class HGTModel(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_node_types, num_edge_types, num_heads, num_layers, dropout, prev_norm = False, last_norm = False, use_rte = True):
+    def __init__(self, input_dim, hidden_dim, num_node_types, num_edge_types, num_heads, num_layers, dropout, prev_norm = False, last_norm = False, use_rte = False):
         super(HGTModel, self).__init__()
         self.input_dim      = input_dim         # Input dimension
         self.hidden_dim     = hidden_dim        # Hiden dimension

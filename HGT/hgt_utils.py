@@ -2,6 +2,7 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 from collections import defaultdict
+from torch_geometric.data import Dataset
 
 def prepare_graph(data, dataset):
     # Populating edge lists in Graph object based on edge_list
@@ -425,3 +426,4 @@ class Graph():
     
     def get_types(self):
         return list(self.node_feature.keys())
+    

@@ -40,21 +40,3 @@ print("FORWARD PASS")
 out = layer(node_feat, node_type, edge_index, edge_type, edge_time) 
 print("Forward pass output shape:", out.shape)
 
-# Model hyperparameters
-in_dim = 64
-hidden_dim = 32 
-num_layers = 3
-
-# Create HGTLayer instances
-hgt_layers = nn.ModuleList()
-for _ in range(num_layers):
-    hgt_layers.append(
-        HGTLayer(64, 64, 2, 5, 4, False, False) 
-    )
-
-# Forward pass
-h = node_feat  # initialize node features
-for layer in hgt_layers:
-    h = layer(h, node_type, edge_index, edge_type) # forward through each layer
-
-node_embedding = h # final node embeddings
