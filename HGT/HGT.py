@@ -22,7 +22,7 @@ class HGTLayer(MessagePassing):
         self.head_dim       = out_dim // num_heads
         self.sqrt_head_dim  = math.sqrt(self.head_dim)
         self.use_norm       = use_norm          # (True/False) Use Normalization
-        self.use_rte        = use_rte           # (True/False) Use Relative Temporal Encoding
+        self.use_rte        = False             # (True/False) Use Relative Temporal Encoding
         self.attention      = None
 
         # Creating Learnable Parameters tensors for relation-specific attention weights
@@ -55,7 +55,7 @@ class HGTLayer(MessagePassing):
             if use_norm:
                 self.normalize.append(nn.LayerNorm(out_dim))
 
-    def het_mutal_attention(self, target_node_rep, source_node_rep, key_source_linear, query_source_linear, edge_type_index):
+    def het_mutual_attention(self, target_node_rep, source_node_rep, key_source_linear, query_source_linear, edge_type_index):
         '''
         Heterogeneous Mutual Attention calculation
         Input:
@@ -76,6 +76,7 @@ class HGTLayer(MessagePassing):
 
         # Dot product between new Key matrix and query, then include meta relation triplet tensor divided by root of head dim
         res_attention = (query_lin_matrix * key_lin_attention_matrix).sum(dim = -1) * (self.rel_priority[edge_type_index] / self.sqrt_head_dim)
+
         return res_attention
     
     def het_message_passing(self, value_source_linear, source_node_rep, edge_type_index):
@@ -123,29 +124,48 @@ class HGTLayer(MessagePassing):
         return result
     
     def forward(self, node_input, node_type, edge_index, edge_type, edge_time):
-        return self.propagate(edge_index, node_input=node_input, node_type=node_type, edge_type=edge_type, edge_time = edge_time)
+        print(f'edge_index is: {edge_index}')
+        print(f'node_input is: {node_input}')
+        return self.propagate(edge_index, 
+                              node_input=node_input,
+                              node_type=node_type, 
+                              edge_type=edge_type, 
+                              edge_time=edge_time,
+                              target_node_input=node_input,
+                              source_node_input=node_input,
+                              target_node_type=node_type,
+                              source_node_type=node_type)
 
-    def message(self, edge_index_i, source_input_node, source_node_type, target_input_node, target_node_type, edge_type, edge_time):
+    def message(self, edge_index_i, target_node_input, source_node_input, target_node_type, source_node_type, edge_type, edge_time):
         '''
         Pytorch Geometric message function under class MessagePassing
         Input:
-         - ***_input_node - source/target input node embedding
+         - ***_node_input - source/target input node embedding
          - ***_node_type - source/target input node type
          - edge_type - edge type between two nodes 
         '''
-        # Create Attention Tensor to store attention coefficients between source and target
-        res_attention_tensor = torch.zeros(edge_index_i.size(0), self.num_heads).to(target_input_node.device)
+        print("")
+        print('MESSAGE')
+        print("")
+        # Create Attention Tensor
+        res_attention_tensor = torch.zeros(edge_index_i.size(0), self.num_heads).to(target_node_input.device)
         # Create Message Tensor
-        res_message_tensor   = torch.zeros(edge_index_i.size(0), self.num_heads, self.head_dim).to(target_input_node.device)
+        res_message_tensor   = torch.zeros(edge_index_i.size(0), self.num_heads, self.head_dim).to(target_node_input.device)
 
+        # Loop over all source node types
         for source_type_index in range(self.num_node_types):
+            rel_source = (source_node_type == int(source_type_index)) # Filter edges based on source node type
+            # Accessing Linear layers for key and value, based on the SOURCE node type
             key_source_linear = self.key_lin_list[source_type_index]
             value_source_linear = self.value_lin_list[source_type_index]
-            rel_source = (source_node_type == int(source_type_index))
 
+            # Loop over all target node types
             for target_type_index in range(self.num_node_types):
+                rel_target_source = (target_node_type == int(target_type_index)) & rel_source # Filter edges based on target node type
+                # Access Linear layer for query based on TARGET node type
                 query_source_linear = self.query_lin_list[target_type_index]
-                rel_target_source = (target_node_type == int(target_type_index)) & rel_source
+
+                # Loop over the types of edges
                 for edge_type_index in range(self.num_edge_types):
                     # Meta data relation (edge_type == relation) & (source_type == s) & (target_type == t) 
                     bool_mask_meta = (edge_type == int(edge_type_index)) & rel_target_source
@@ -153,19 +173,21 @@ class HGTLayer(MessagePassing):
                         continue
 
                     # Get relavent Node representations based on rel_edge_target_source
-                    source_node_rep = source_input_node[bool_mask_meta]
-                    target_node_rep = target_input_node[bool_mask_meta]
+                    source_node_rep = source_node_input[bool_mask_meta]
+                    target_node_rep = target_node_input[bool_mask_meta]
 
                     # Relative Temporal Encoding option
                     if self.use_rte:
                         source_node_rep = self.emb(source_node_rep, edge_time[bool_mask_meta])
 
                     # Heterogenous Mutual Attention
-                    res_attention = self.het_mutal_attention(self, target_node_rep, source_node_rep, key_source_linear, query_source_linear, edge_type_index)
+                    print(f'Performing heterogeneous mutual attention between source node type: {source_type_index} and target node type: {target_type_index}')
+                    res_attention = self.het_mutual_attention(target_node_rep, source_node_rep, key_source_linear, query_source_linear, edge_type_index)
                     res_attention_tensor[bool_mask_meta] = res_attention
 
                     # Heterogenous Message Passing
-                    res_message = self.het_message_passing(self, value_source_linear, source_node_rep, edge_type_index)
+                    print("Passing messages from source node type:", source_type_index, "through edge type:", edge_type_index)
+                    res_message = self.het_message_passing(value_source_linear, source_node_rep, edge_type_index)
                     res_message_tensor[bool_mask_meta] = res_message
             
         # Softmax Output
@@ -179,6 +201,9 @@ class HGTLayer(MessagePassing):
         '''
         Pytorch Geometric Update Function
         '''
+        print("")
+        print("UPDATE")
+        print("")
         return self.target_specific_aggregation(aggregated_output, node_input, node_type)
 
 

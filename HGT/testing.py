@@ -1,31 +1,60 @@
 import torch
 from hgt import *
-from model import HGTModel
+from model import *
 
-# Create a simple graph
-x = torch.randn(10, 128) # 10 nodes, 128 input features
-edge_index = torch.tensor([[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 
-                           [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]]) # connectivity
-node_type = torch.zeros(10, dtype=torch.long) 
-edge_type = torch.zeros(10, dtype=torch.long)
-edge_time = torch.randn(10) 
-y = torch.randint(0, 2, (10,)) # binary target
+# Create dummy input 
+node_feat = torch.rand(20, 64) 
+node_type = torch.randint(0, 2, (20,))
+edge_index = torch.randint(0, 20, (2, 20))
+edge_type = torch.randint(0, 5, (20,))
+# Create dummy edge time
+num_edges = edge_index.size(1) 
+edge_time = torch.randint(0, 100, (num_edges,))
 
 
-# Model
-model = HGTModel(128, 64, 1, 1, 2, 1, 0.5) 
-# classifier = Classifier(64, 2)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-criterion = torch.nn.NLLLoss()
+# Create layer
+# in_dim, out_dim, num_node_types, num_edge_types, num_heads, use_norm, use_rte
+layer = HGTLayer(64, 64, 2, 5, 4, False, False)
 
-print(model)
+# message(self, edge_index_i, target_node_input, source_node_input, target_node_type, source_node_type, edge_type, edge_time):
+# Message passing
+msg = layer.message(edge_index[0], node_feat, node_feat, node_type, node_type, edge_type, 4)
+print("Message passing output shape:", msg.shape)
 
-# Single training iteration
-out = model(x, node_type, edge_time, edge_index, edge_type)
-# out = classifier(out)
-# loss = criterion(out, y)
-# loss.backward()
-# optimizer.step()
+# # Attention 
+att = layer.het_mutual_attention(node_feat, node_feat, layer.key_lin_list[0], 
+                                layer.query_lin_list[0], 0)
+print("Attention output shape:", att.shape) 
 
-# print("Loss:", loss.item())
+# Message aggregation
+agg = layer.het_message_passing(layer.value_lin_list[0], node_feat, 0)
+print("Aggregation output shape:", agg.shape)
+
+# Skip connection
+out = layer.target_specific_aggregation(node_feat, node_feat, node_type)
+print("Skip connection output shape:", out.shape)
+
+# Forward pass
+print("FORWARD PASS")
+out = layer(node_feat, node_type, edge_index, edge_type, edge_time) 
+print("Forward pass output shape:", out.shape)
+
+# Model hyperparameters
+in_dim = 64
+hidden_dim = 32 
+num_layers = 3
+
+# Create HGTLayer instances
+hgt_layers = nn.ModuleList()
+for _ in range(num_layers):
+    hgt_layers.append(
+        HGTLayer(64, 64, 2, 5, 4, False, False) 
+    )
+
+# Forward pass
+h = node_feat  # initialize node features
+for layer in hgt_layers:
+    h = layer(h, node_type, edge_index, edge_type) # forward through each layer
+
+node_embedding = h # final node embeddings
