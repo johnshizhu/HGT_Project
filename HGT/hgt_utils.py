@@ -166,7 +166,23 @@ def feature_OAG(layer_data, graph):
             texts = np.array(list(graph.node_feature[_type].loc[idxs, 'title']), dtype=np.str)
     return feature, times, indxs, texts
 
-def sample_subgraph(graph, time_range, sampled_depth = 2, sampled_number = 8, inp = None, feature_extractor = feature_OAG):
+def feature_MAG(layer_data, graph):
+    feature = {}
+    times   = {}
+    indxs   = {}
+    texts   = []
+    for _type in layer_data:
+        if len(layer_data[_type]) == 0:
+            continue
+        idxs  = np.array(list(layer_data[_type].keys()), dtype = np.int)
+        tims  = np.array(list(layer_data[_type].values()))[:,1]
+        feature[_type] = graph.node_feature[_type][idxs]
+        times[_type]   = tims
+        indxs[_type]   = idxs
+        
+    return feature, times, indxs, texts
+
+def sample_subgraph(graph, sampled_depth = 2, sampled_number = 8, inp = None, feature_extractor = feature_OAG):
     '''
         Sample Sub-Graph based on the connection of other nodes with currently sampled nodes
         We maintain budgets for each node type, indexed by <node_id, time>.
@@ -206,11 +222,12 @@ def sample_subgraph(graph, time_range, sampled_depth = 2, sampled_number = 8, in
                     source_time = adl[source_id]
                     if source_time == None:
                         source_time = target_time
-                    if source_time > np.max(list(time_range.keys())) or source_id in layer_data[source_type]:
+                    if source_id in layer_data[source_type]:
                         continue
                     budget[source_type][source_id][0] += 1. / len(sampled_ids)
                     budget[source_type][source_id][1] = source_time
 
+ 
     '''
         First adding the sampled nodes then updating budget.
     '''
@@ -289,7 +306,6 @@ def sample_subgraph(graph, time_range, sampled_depth = 2, sampled_number = 8, in
                         if source_key in sld:
                             source_ser = sld[source_key][0]
                             edge_list[target_type][source_type][relation_type] += [[target_ser, source_ser]]
-    print("sample subgraph complete")
     return feature, times, edge_list, indxs, texts
 
 def to_torch(feature, time, edge_list, graph):
@@ -337,22 +353,6 @@ def to_torch(feature, time, edge_list, graph):
     edge_index   = torch.LongTensor(edge_index).t()
     edge_type    = torch.LongTensor(edge_type)
     return node_feature, node_type, edge_time, edge_index, edge_type, node_dict, edge_dict
-
-def feature_MAG(layer_data, graph):
-    feature = {}
-    times   = {}
-    indxs   = {}
-    texts   = []
-    for _type in layer_data:
-        if len(layer_data[_type]) == 0:
-            continue
-        idxs  = np.array(list(layer_data[_type].keys()), dtype = np.int)
-        tims  = np.array(list(layer_data[_type].values()))[:,1]
-        feature[_type] = graph.node_feature[_type][idxs]
-        times[_type]   = tims
-        indxs[_type]   = idxs
-        
-    return feature, times, indxs, texts
 
 '''
 Graph object implementation from original HGT paper
@@ -426,4 +426,44 @@ class Graph():
     
     def get_types(self):
         return list(self.node_feature.keys())
+
+def randint():
+    return np.random.randint(2**31 - 1)
+   
+def ogbn_sample(seed, samp_nodes, graph, sample_depth, sample_width):
+    np.random.seed(seed)
+    ylabel      = torch.LongTensor(graph.y[samp_nodes])
+    #graph, time_range, sampled_depth = 2, sampled_number = 8, inp = None, feature_extractor = feature_MAG
+    feature, times, edge_list, indxs, _ = sample_subgraph(
+        graph,
+        inp = {'paper': np.concatenate([samp_nodes, graph.years[samp_nodes]]).reshape(2, -1).transpose()},
+        sampled_depth = sample_depth, 
+        sampled_number = sample_width,
+        feature_extractor = feature_MAG)
     
+    node_feature, node_type, edge_time, edge_index, edge_type, node_dict, edge_dict = to_torch(feature, times, edge_list, graph)
+    
+    train_mask = graph.train_mask[indxs['paper']]
+    valid_mask = graph.valid_mask[indxs['paper']]
+    test_mask  = graph.test_mask[indxs['paper']]
+    ylabel     = graph.y[indxs['paper']]
+    return node_feature, node_type, edge_time, edge_index, edge_type, (train_mask, valid_mask, test_mask), ylabel
+
+def prepare_data_train(pool, n_batch, batch_size, target_nodes, graph, sample_depth, sample_width):
+    '''
+        Sampled and prepare training and validation data using multi-process parallization.
+    '''
+    jobs = []
+
+    for batch_id in np.arange(n_batch):
+        print(f'starting preprocessing batch: {batch_id}')
+        p = pool.apply_async(ogbn_sample, args=([
+            randint(), \
+            np.random.choice(target_nodes, batch_size, replace = False),
+            graph,
+            sample_depth,
+            sample_width]))
+        jobs.append(p)
+        print(f'finished preprocessing batch: {batch_id}')
+    print("Preprocessing complete ---------------------------------------------------")
+    return jobs
