@@ -124,8 +124,6 @@ class HGTLayer(MessagePassing):
         return result
     
     def forward(self, node_input, node_type, edge_index, edge_type, edge_time):
-        print(f'edge_index is: {edge_index}')
-        print(f'node_input is: {node_input}')
         return self.propagate(edge_index, 
                               node_input=node_input,
                               node_type=node_type, 
@@ -154,6 +152,7 @@ class HGTLayer(MessagePassing):
 
         # Loop over all source node types
         for source_type_index in range(self.num_node_types):
+            print(f'Current source_type_index is: {source_type_index}')
             rel_source = (source_node_type == int(source_type_index)) # Filter edges based on source node type
             # Accessing Linear layers for key and value, based on the SOURCE node type
             key_source_linear = self.key_lin_list[source_type_index]
@@ -161,15 +160,18 @@ class HGTLayer(MessagePassing):
 
             # Loop over all target node types
             for target_type_index in range(self.num_node_types):
+                print(f'Current target_index_index is: {target_type_index}')
                 rel_target_source = (target_node_type == int(target_type_index)) & rel_source # Filter edges based on target node type
                 # Access Linear layer for query based on TARGET node type
                 query_source_linear = self.query_lin_list[target_type_index]
 
                 # Loop over the types of edges
                 for edge_type_index in range(self.num_edge_types):
+                    print(f'Current edge_type_index is: {edge_type_index}')
                     # Meta data relation (edge_type == relation) & (source_type == s) & (target_type == t) 
+                    print(rel_target_source)
                     bool_mask_meta = (edge_type == int(edge_type_index)) & rel_target_source
-                    if bool_mask_meta.sum() == 0:
+                    if bool_mask_meta.sum() == 0: 
                         continue
 
                     # Get relavent Node representations based on rel_edge_target_source
