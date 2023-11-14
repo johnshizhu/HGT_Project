@@ -37,7 +37,7 @@ class HGTModel(nn.Module):
         # Last layer for controlling normalization, etc. for last layer
         self.hgt_layers.append(HGTLayer(input_dim, hidden_dim, num_node_types, num_edge_types, num_heads, last_norm, use_rte))
 
-    def forward(self, node_feature, node_type, edge_time, edge_index, edge_type):
+    def forward(self, node_feature, node_type, edge_index, edge_type, edge_time):
         # Initialize tensor of 0s for aggregated node features
         result = torch.zeros(node_feature.size(0), self.hidden_dim)
 
