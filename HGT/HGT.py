@@ -143,9 +143,6 @@ class HGTLayer(MessagePassing):
          - ***_node_type - source/target input node type
          - edge_type - edge type between two nodes 
         '''
-        print("")
-        print('MESSAGE')
-        print("")
         # Create Attention Tensor
         res_attention_tensor = torch.zeros(edge_index_i.size(0), self.num_heads).to(target_node_input.device)
         # Create Message Tensor
@@ -190,67 +187,48 @@ class HGTLayer(MessagePassing):
                     # Meta relation triple, True at indexes where typing matches up
                     meta_relation_mask = edge_mask & source_edges_mask & target_edges_mask
 
-                    # if any of the masks don't have any units, continue
+                    # skip any meta-relation triplets that don't "exist"
                     if meta_relation_mask.sum() == 0: 
-                        print(f'NO meta-relation for: <{source_type_index}, {edge_type_index}, {target_type_index}>')
-                        print("")
+                        # print(f'NO meta-relation for: <{source_type_index}, {edge_type_index}, {target_type_index}>')
+                        # print("")
                         continue
-                    else:
-                        print(f'FOUND meta-relation of triplet source_type_index:{source_type_index}, edge_type_index:{edge_type_index}, target_type_index:{target_type_index}')
-                        print(f'meta_relation_mask is: {meta_relation_mask}')
-                        print(f'total amount is: {meta_relation_mask.sum()}')
-                        print("")
+                    # else:
+                    #     print(f'FOUND meta-relation of triplet source_type_index:{source_type_index}, edge_type_index:{edge_type_index}, target_type_index:{target_type_index}')
+                    #     print(f'meta_relation_mask is: {meta_relation_mask}')
+                    #     print(f'total amount is: {meta_relation_mask.sum()}')
+                    #     print("")
 
-                    # get the corresponding source_node_representations
-
-                    # apply meta_relation_mask on edge_relations[0]
+                    # apply meta_relation_mask on to get indexes of node_feature
                     source_node_index_location = edge_relations[0][meta_relation_mask]
-                    # based on source_node_index_location, create a tensor of source_node_representations
+                    target_node_index_location = edge_relations[1][meta_relation_mask]
 
+                    # get Node representations based on index_location
+                    source_node_rep = source_node_input[source_node_index_location]
+                    target_node_rep = target_node_input[target_node_index_location]
 
-                    # get the corresponding target_node_representations
+                    # Relative Temporal Encoding option
+                    if self.use_rte:
+                        source_node_rep = self.emb(source_node_rep, edge_time[meta_relation_mask])
 
-                    # apply meta_relation_mask on edge_relations[1]
+                    # Heterogenous Mutual Attention                    
+                    res_attention = self.het_mutual_attention(target_node_rep, source_node_rep, key_source_linear, query_source_linear, edge_type_index)
+                    res_attention_tensor[meta_relation_mask] = res_attention
 
+                    # Heterogenous Message Passing
+                    res_message = self.het_message_passing(value_source_linear, source_node_rep, edge_type_index)
+                    res_message_tensor[meta_relation_mask] = res_message
 
-        #             # Get relavent Node representations based on rel_edge_target_source
-        #             source_node_rep = source_node_input[source_nodes_mask]
-        #             target_node_rep = target_node_input[target_nodes_mask]
-
-        #             # Relative Temporal Encoding option
-        #             if self.use_rte:
-        #                 source_node_rep = self.emb(source_node_rep, edge_time[meta_relation_mask])
-
-        #             # Heterogenous Mutual Attention
-        #             print(f'Performing heterogeneous mutual attention for source node type: {source_type_index}, edge type: {edge_type_index}, and target node type: {target_type_index}')
-        #             res_attention = self.het_mutual_attention(target_node_rep, source_node_rep, key_source_linear, query_source_linear, edge_type_index)
-        #             res_attention_tensor[meta_relation_mask] = res_attention
-
-        #             # Heterogenous Message Passing
-        #             print("Passing messages from source node type:", source_type_index, "through edge type:", edge_type_index)
-        #             res_message = self.het_message_passing(value_source_linear, source_node_rep, edge_type_index)
-        #             res_message_tensor[meta_relation_mask] = res_message
-        # print("")    
-        # print(f'res_attention_tensor is: {res_attention_tensor}')
-        # print(f'shape res_attention_tensor is: {res_attention_tensor.shape}')
-        # print("")
-        # print(f'res_message_tensor is: {res_message_tensor}')
-        # print(f'shape res_message_tensor is: {res_message_tensor.shape}')
-
-        # # Softmax Output
-        # self.attention = softmax(res_attention_tensor, edge_index_i)
-        # result = res_message_tensor * self.attention.view(-1, self.num_heads, 1)
-        # # Delete tensors from memory
-        # del res_attention_tensor, res_message_tensor
-        # return result.view(-1, self.out_dim)
+        # Softmax Output
+        self.attention = softmax(res_attention_tensor, edge_index_i)
+        result = res_message_tensor * self.attention.view(-1, self.num_heads, 1)
+        # Delete tensors from memory
+        del res_attention_tensor, res_message_tensor
+        return result.view(-1, self.out_dim)
 
     def update(self, aggregated_output, node_input, node_type):
         '''
         Pytorch Geometric Update Function
         '''
-        print("")
-        print("UPDATE")
-        print("")
         return self.target_specific_aggregation(aggregated_output, node_input, node_type)
 
 

@@ -96,6 +96,7 @@ def prepare_graph(data, dataset):
     m = normalize(sp.coo_matrix((v, i), \
         shape=(data.num_nodes_dict['institution'], data.num_nodes_dict['author'])))
     out = m.dot(cv)
+    
     graph.node_feature['institution'] = np.concatenate((out, np.log10(deg['institution'].reshape(-1, 1))), axis=-1)      
 
     # y_dict
