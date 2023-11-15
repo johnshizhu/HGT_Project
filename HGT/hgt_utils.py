@@ -3,6 +3,77 @@ import scipy.sparse as sp
 import torch
 from collections import defaultdict
 from torch_geometric.data import Dataset
+from collections import defaultdict
+
+class Graph():
+    '''
+    Graph object implementation from original HGT paper
+    This is thier implementation, all credit goes to the authors
+    '''
+    def __init__(self):
+        super(Graph, self).__init__()
+        '''
+            node_forward and backward are only used when building the data. 
+            Afterwards will be transformed into node_feature by DataFrame
+            
+            node_forward: name -> node_id
+            node_bacward: node_id -> feature_dict
+            node_feature: a DataFrame containing all features
+        '''
+        self.node_forward = defaultdict(lambda: {})
+        self.node_bacward = defaultdict(lambda: [])
+        self.node_feature = defaultdict(lambda: [])
+
+        '''
+            edge_list: index the adjacancy matrix (time) by 
+            <target_type, source_type, relation_type, target_id, source_id>
+        '''
+        self.edge_list = defaultdict( #target_type
+                            lambda: defaultdict(  #source_type
+                                lambda: defaultdict(  #relation_type
+                                    lambda: defaultdict(  #target_id
+                                        lambda: defaultdict( #source_id(
+                                            lambda: int # time
+                                        )))))
+        self.times = {}
+    def add_node(self, node):
+        nfl = self.node_forward[node['type']]
+        if node['id'] not in nfl:
+            self.node_bacward[node['type']] += [node]
+            ser = len(nfl)
+            nfl[node['id']] = ser
+            return ser
+        return nfl[node['id']]
+    def add_edge(self, source_node, target_node, time = None, relation_type = None, directed = True):
+        edge = [self.add_node(source_node), self.add_node(target_node)]
+        '''
+            Add bi-directional edges with different relation type
+        '''
+        self.edge_list[target_node['type']][source_node['type']][relation_type][edge[1]][edge[0]] = time
+        if directed:
+            self.edge_list[source_node['type']][target_node['type']]['rev_' + relation_type][edge[0]][edge[1]] = time
+        else:
+            self.edge_list[source_node['type']][target_node['type']][relation_type][edge[0]][edge[1]] = time
+        self.times[time] = True
+        
+    def update_node(self, node):
+        nbl = self.node_bacward[node['type']]
+        ser = self.add_node(node)
+        for k in node:
+            if k not in nbl[ser]:
+                nbl[ser][k] = node[k]
+
+    def get_meta_graph(self):
+        types = self.get_types()
+        metas = []
+        for target_type in self.edge_list:
+            for source_type in self.edge_list[target_type]:
+                for r_type in self.edge_list[target_type][source_type]:
+                    metas += [(target_type, source_type, r_type)]
+        return metas
+    
+    def get_types(self):
+        return list(self.node_feature.keys())
 
 def prepare_graph(data, dataset):
     # Populating edge lists in Graph object based on edge_list
@@ -355,79 +426,6 @@ def to_torch(feature, time, edge_list, graph):
     edge_type    = torch.LongTensor(edge_type)
     return node_feature, node_type, edge_time, edge_index, edge_type, node_dict, edge_dict
 
-'''
-Graph object implementation from original HGT paper
-This is thier implementation, all credit goes to the authors
-'''
-
-from collections import defaultdict
-
-class Graph():
-    def __init__(self):
-        super(Graph, self).__init__()
-        '''
-            node_forward and backward are only used when building the data. 
-            Afterwards will be transformed into node_feature by DataFrame
-            
-            node_forward: name -> node_id
-            node_bacward: node_id -> feature_dict
-            node_feature: a DataFrame containing all features
-        '''
-        self.node_forward = defaultdict(lambda: {})
-        self.node_bacward = defaultdict(lambda: [])
-        self.node_feature = defaultdict(lambda: [])
-
-        '''
-            edge_list: index the adjacancy matrix (time) by 
-            <target_type, source_type, relation_type, target_id, source_id>
-        '''
-        self.edge_list = defaultdict( #target_type
-                            lambda: defaultdict(  #source_type
-                                lambda: defaultdict(  #relation_type
-                                    lambda: defaultdict(  #target_id
-                                        lambda: defaultdict( #source_id(
-                                            lambda: int # time
-                                        )))))
-        self.times = {}
-    def add_node(self, node):
-        nfl = self.node_forward[node['type']]
-        if node['id'] not in nfl:
-            self.node_bacward[node['type']] += [node]
-            ser = len(nfl)
-            nfl[node['id']] = ser
-            return ser
-        return nfl[node['id']]
-    def add_edge(self, source_node, target_node, time = None, relation_type = None, directed = True):
-        edge = [self.add_node(source_node), self.add_node(target_node)]
-        '''
-            Add bi-directional edges with different relation type
-        '''
-        self.edge_list[target_node['type']][source_node['type']][relation_type][edge[1]][edge[0]] = time
-        if directed:
-            self.edge_list[source_node['type']][target_node['type']]['rev_' + relation_type][edge[0]][edge[1]] = time
-        else:
-            self.edge_list[source_node['type']][target_node['type']][relation_type][edge[0]][edge[1]] = time
-        self.times[time] = True
-        
-    def update_node(self, node):
-        nbl = self.node_bacward[node['type']]
-        ser = self.add_node(node)
-        for k in node:
-            if k not in nbl[ser]:
-                nbl[ser][k] = node[k]
-
-    def get_meta_graph(self):
-        types = self.get_types()
-        metas = []
-        for target_type in self.edge_list:
-            for source_type in self.edge_list[target_type]:
-                for r_type in self.edge_list[target_type][source_type]:
-                    metas += [(target_type, source_type, r_type)]
-        return metas
-    
-    def get_types(self):
-        return list(self.node_feature.keys())
-
 def randint():
     return np.random.randint(2**31 - 1)
    
@@ -468,3 +466,23 @@ def prepare_data_train(pool, n_batch, batch_size, target_nodes, graph, sample_de
         print(f'finished preprocessing batch: {batch_id}')
     print("Preprocessing complete ---------------------------------------------------")
     return jobs
+
+def get_n_batches_training_data(n_batch, graph, sample_depth, sample_width, target_nodes, batch_size):
+    seed = randint()
+    samp_nodes = np.random.choice(target_nodes, batch_size, replace = False)
+    datas = []
+    print("Starting Sampling...")
+    for batch_id in np.arange(n_batch):
+        node_feature, node_type, edge_time, edge_index, edge_type, (train_mask, valid_mask, test_mask), ylabel = ogbn_sample(seed, samp_nodes, graph, sample_depth, sample_width)
+        p = (
+            node_feature,
+            node_type,
+            edge_time,
+            edge_index,
+            edge_type,
+            (train_mask, valid_mask, test_mask),
+            ylabel
+        )
+        datas.append(p)
+    print("...Sampling Done")
+    return datas
