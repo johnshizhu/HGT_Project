@@ -1,9 +1,11 @@
+This project is work in progress....
+
 # Heterogenous Graph Transformer (HGT)
 
-Goals: 
+Project Goals: 
 1. Implement a Heterogeneous Graph Transformer Architecture.
-2. Optimize model processes through leveraging sparsity and quantization. 
-3. Introduce distributed training implementation, with Top-K SGD. 
+2. Optimize model processes through leveraging sparsity and quantization.
+3. Analyze effects of optimization techniques on model performance. 
 
 - This project is done ONLY for educational purposes
 
@@ -25,7 +27,11 @@ For original paper and implementation, reference: https://dl.acm.org/doi/fullHtm
   - --------------------------------------------------------------------------------
   - sparse_hgt.py - HGT layer implementation w/ sparsity optimizations
   - sparse_model.py - HGT model implementation w/ sparsity optimizations
-  - sparse_mag_experiment.ipynb - sparse HGT experimentts
+  - sparse_mag_experiment.ipynb - sparse HGT experiments
+  - --------------------------------------------------------------------------------
+  - quantize_hgt.py - HGT layer with quantization optimizations
+  - quantize_model.py - HGT model implementation w/ quantization optimizations
+  - quantize_experiments.py - quantized HGT experiments
 
 ## Dependencies
 - Pytorch
