@@ -76,6 +76,9 @@ class Graph():
         return list(self.node_feature.keys())
 
 def prepare_graph(data, dataset):
+    '''
+    Original function to prepare graph from dataset from original HGT paper.   
+    '''
     # Populating edge lists in Graph object based on edge_list
     print("Populating edge lists into Graph object")
     edge_index_dict = data.edge_index_dict 
@@ -430,6 +433,9 @@ def randint():
     return np.random.randint(2**31 - 1)
    
 def ogbn_sample(seed, samp_nodes, graph, sample_depth, sample_width):
+    '''
+    Manages subgraph sampling based on specified HGSampling parameters
+    '''
     np.random.seed(seed)
     ylabel      = torch.LongTensor(graph.y[samp_nodes])
     #graph, time_range, sampled_depth = 2, sampled_number = 8, inp = None, feature_extractor = feature_MAG
@@ -451,6 +457,7 @@ def ogbn_sample(seed, samp_nodes, graph, sample_depth, sample_width):
 def prepare_data_train(pool, n_batch, batch_size, target_nodes, graph, sample_depth, sample_width):
     '''
         Sampled and prepare training and validation data using multi-process parallization.
+        Does all data preprocessing before training
     '''
     jobs = []
 
@@ -468,6 +475,9 @@ def prepare_data_train(pool, n_batch, batch_size, target_nodes, graph, sample_de
     return jobs
 
 def get_n_batches_training_data(n_batch, graph, sample_depth, sample_width, target_nodes, batch_size):
+    '''
+    Manages getting batches of training data    
+    '''
     seed = randint()
     samp_nodes = np.random.choice(target_nodes, batch_size, replace = False)
     datas = []

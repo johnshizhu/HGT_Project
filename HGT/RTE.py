@@ -9,9 +9,7 @@ import math
 
 class RTE(nn.Module):
     '''
-    Inputs:
-     - hidden_dim - hidden dimension size
-     - max_encode -  
+    Implementation of Relative Temporal Encoding based on original paper implemenation
     '''
     def __init__(self, hidden_dim, max_encode = 240, dropout = 0.2):
         super(RTE, self).__init__()
