@@ -19,22 +19,14 @@ For original paper and implementation, reference: https://dl.acm.org/doi/fullHtm
 
 ## Overview
 - HGT/
-  - HGT.py - Implementation of the Heterogeneous Graph Transformer Layer
-  - mode.py - Implementation of the Heterogeneous Graph Transformer full model + Classifier
-  - RTE.py - Implementation of Relative Temporal Encoding (in progress)
+  - hgt.py - Implementation of the Heterogeneous Graph Transformer Layer
+  - model.py - Implementation of the Heterogeneous Graph Transformer full model + Classifier
+  - rte.py - Implementation of Relative Temporal Encoding (in progress)
   - hgt_utils.py - Various Functions used for Data preprocessing and training
   - mag_experiment.ipynb - Jupyter Notebook for Training original HGT implementation
-  - --------------------------------------------------------------------------------
-  - sparse_hgt.py - HGT layer implementation w/ sparsity optimizations
-  - sparse_model.py - HGT model implementation w/ sparsity optimizations
-  - sparse_mag_experiment.ipynb - sparse HGT experiments
-  - --------------------------------------------------------------------------------
-  - quantize_hgt.py - HGT layer with quantization optimizations
-  - quantize_model.py - HGT model implementation w/ quantization optimizations
   - quantize_experiments.py - quantized HGT experiments
 
 ## Dependencies
 - Pytorch
 - Pytorch_Geometric
 
-This project is currently a work in progress....

@@ -11,7 +11,7 @@ from rte import RTE
 import math
 
 class HGTLayer(MessagePassing):
-    def __init__(self, in_dim, out_dim, num_node_types, num_edge_types, num_heads, use_norm, use_rte):
+    def __init__(self, in_dim, out_dim, num_node_types, num_edge_types, num_heads, use_norm, use_rte = False):
         super(HGTLayer, self).__init__()
 
         self.in_dim         = in_dim            # Input dimension
@@ -22,7 +22,7 @@ class HGTLayer(MessagePassing):
         self.head_dim       = out_dim // num_heads
         self.sqrt_head_dim  = math.sqrt(self.head_dim)
         self.use_norm       = use_norm          # (True/False) Use Normalization
-        self.use_rte        = False             # (True/False) Use Relative Temporal Encoding
+        self.use_rte        = use_rte           # (True/False) Use Relative Temporal Encoding
         self.attention      = None
 
         # Creating Learnable Parameters tensors for relation-specific attention weights
@@ -189,14 +189,7 @@ class HGTLayer(MessagePassing):
 
                     # skip any meta-relation triplets that don't "exist"
                     if meta_relation_mask.sum() == 0: 
-                        # print(f'NO meta-relation for: <{source_type_index}, {edge_type_index}, {target_type_index}>')
-                        # print("")
                         continue
-                    # else:
-                    #     print(f'FOUND meta-relation of triplet source_type_index:{source_type_index}, edge_type_index:{edge_type_index}, target_type_index:{target_type_index}')
-                    #     print(f'meta_relation_mask is: {meta_relation_mask}')
-                    #     print(f'total amount is: {meta_relation_mask.sum()}')
-                    #     print("")
 
                     # apply meta_relation_mask on to get indexes of node_feature
                     source_node_index_location = edge_relations[0][meta_relation_mask]
