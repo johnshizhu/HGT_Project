@@ -1,5 +1,3 @@
-This project is work in progress....
-
 # Heterogenous Graph Transformer (HGT)
 
 Project Goals: 
